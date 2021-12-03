@@ -1,0 +1,17 @@
+version: '3'
+services:
+  web:
+    build:
+      context: .
+      args:
+        USER_ID: ${USER_ID}
+        GROUP_ID: ${GROUP_ID}
+      dockerfile: ./docker/Dockerfile
+    expose:
+      - "9000"
+    volumes:
+      - ./:/var/www/html
+    environment:
+      PHP_XDEBUG_ENABLED: 1
+      XDEBUG_CONFIG: ${XDEBUG_CONFIG:-remote_host=172.18.19.1}
+    container_name: filesystem-azure-blob-storage
