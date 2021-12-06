@@ -18,12 +18,23 @@
             "MedTrainer\\Flysystem\\AzureBlobStorage\\Tests\\": "tests/"
         }
     },
+    "config": {
+        "bin-dir": "bin",
+        "optimize-autoloader": true,
+        "preferred-install": {
+            "*": "dist"
+        },
+        "sort-packages": true,
+        "process-timeout": 0
+    },
     "minimum-stability": "stable",
     "require": {
-        "php": ">=7.1",
-        "league/flysystem": "^2.0"
+        "php": ">=7.2",
+        "league/flysystem": "^2.0",
+        "microsoft/azure-storage-blob": "*"
     },
     "require-dev": {
+        "league/flysystem-adapter-test-utilities": "^2.3",
         "phpunit/phpunit": "^8"
     }
 }
