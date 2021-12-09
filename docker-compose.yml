@@ -7,6 +7,8 @@ services:
         USER_ID: ${USER_ID}
         GROUP_ID: ${GROUP_ID}
       dockerfile: ./docker/Dockerfile
+    ports:
+      - "80:8088"
     expose:
       - "9000"
     volumes:
@@ -15,3 +17,12 @@ services:
       PHP_XDEBUG_ENABLED: 1
       XDEBUG_CONFIG: ${XDEBUG_CONFIG:-remote_host=172.18.19.1}
     container_name: filesystem-azure-blob-storage
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    ports:
+      - 10000:10000
+      - 10001:10001
+      - 10002:10002
+volumes:
+    azurite-data:
+      name: azurite-data
