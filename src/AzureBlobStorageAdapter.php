@@ -21,15 +21,16 @@ use League\Flysystem\UnableToWriteFile;
 use League\MimeTypeDetection\FinfoMimeTypeDetector;
 use League\MimeTypeDetection\MimeTypeDetector;
 use MicrosoftAzure\Storage\Blob\BlobRestProxy;
-use MicrosoftAzure\Storage\Blob\Models\CreateBlobBlockOptions;
+use MicrosoftAzure\Storage\Blob\Models\BlobProperties;
 use MicrosoftAzure\Storage\Blob\Models\CreateBlockBlobOptions;
 use MicrosoftAzure\Storage\Blob\Models\CreateContainerOptions;
+use MicrosoftAzure\Storage\Blob\Models\GetBlobResult;
 use MicrosoftAzure\Storage\Blob\Models\PublicAccessType;
 use MicrosoftAzure\Storage\Common\Exceptions\ServiceException;
 use Psr\Log\LoggerInterface;
 
 
-final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
+final class AzureBlobStorageAdapter implements FilesystemAdapter
 {
     protected static $metaOptions = [
         'CacheControl',
@@ -152,20 +153,16 @@ final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
 
     public function read(string $path): string
     {
-        $response = $this->readStream($path);
-        if (!isset($response['stream']) || ! is_resource($response['stream'])) {
-            return $response;
-        }
+        $response = $this->readObject($path);
 
-        $response['contents'] = stream_get_contents($response['stream']);
-        unset($response['stream']);
-
-        return $response;
+        return stream_get_contents($response->getContentStream());
     }
 
     public function readStream(string $path)
     {
-        // TODO: Implement readStream() method.
+        $object = $this->readObject($path);
+
+        return $object->getContentStream();
     }
 
     public function delete(string $path): void
@@ -275,5 +272,15 @@ final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
         } catch (ServiceException $e) {
             $this->logger->error($e->getErrorMessage());
         }
+    }
+
+    private function readObject(string $path): GetBlobResult
+    {
+        $location = $this->prefixer->prefixPath($path);
+
+        return $this->client->getBlob(
+            $this->container,
+            $location
+        );
     }
 }

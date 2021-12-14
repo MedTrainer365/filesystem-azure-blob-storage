@@ -5,6 +5,7 @@ namespace MedTrainer\Flysystem\AzureBlobStorage\Tests;
 use League\Flysystem\Config;
 use MedTrainer\Flysystem\AzureBlobStorage\AzureBlobStorageAdapter;
 use MicrosoftAzure\Storage\Blob\BlobRestProxy;
+use MicrosoftAzure\Storage\Blob\Models\GetBlobResult;
 use MicrosoftAzure\Storage\Blob\Models\PutBlobResult;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -12,6 +13,8 @@ use Psr\Log\LoggerInterface;
 
 class AzureBlobStorageAdapterTest extends TestCase
 {
+    const FILE_TEST = 'test_image.png';
+
     /** @var MockObject|LoggerInterface  */
     private $logger;
 
@@ -59,11 +62,11 @@ class AzureBlobStorageAdapterTest extends TestCase
     {
         return [
             'fileExists' => [
-                'fileName' => 'test_image.png',
+                'fileName' => self::FILE_TEST,
                 'expected' => true
             ],
             'fileDoesNtExists' => [
-                'fileName' => 'test_image.png',
+                'fileName' => self::FILE_TEST,
                 'expected' => false
             ]
 
@@ -75,7 +78,6 @@ class AzureBlobStorageAdapterTest extends TestCase
      */
     public function testWrite($destinationFile, $sourceFile, $config): void
     {
-        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
         $responseClient = $this->createMock(PutBlobResult::class);
         $responseClient->expects(self::any())
             ->method('getLastModified')
@@ -129,13 +131,13 @@ class AzureBlobStorageAdapterTest extends TestCase
     {
         return [
             'testWithOutMime' => [
-                'destinationFile' => 'jesus/file_demo.png',
-                'sourceFile' => sprintf('%s/%s', __DIR__, 'files/test_image.png'),
+                'destinationFile' => sprintf('mt/%s', self::FILE_TEST),
+                'sourceFile' => sprintf('%s/%s/%s', __DIR__, 'files', self::FILE_TEST),
                 'configuration' => []
             ],
             'testWithMime' => [
-                'destinationFile' => 'file_demo.png',
-                'sourceFile' => sprintf('%s/%s', __DIR__, 'files/test_image.png'),
+                'destinationFile' => self::FILE_TEST,
+                'sourceFile' => sprintf('%s/%s/%s', __DIR__, 'files', self::FILE_TEST),
                 'configuration' => [
                     'ContentType' => 'image/png'
                 ]
@@ -143,7 +145,61 @@ class AzureBlobStorageAdapterTest extends TestCase
         ];
     }
 
+    /**
+     * @dataProvider getRead
+     */
+    public function testRead($path, $sourceFile, $expected)
+    {
+        $responseClient = $this->createMock(GetBlobResult::class);
+        $responseClient->expects(self::any())
+            ->method('getContentStream')
+            ->willReturn(fopen($sourceFile, 'r'));
+        $blobClient = $this->createMock(BlobRestProxy::class);
+        $blobClient->expects(self::any())
+            ->method('getBlob')
+            ->willReturn($responseClient);
+        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+        $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
+        $response = $service->read($path);
 
+        $this->assertSame( stream_get_contents($expected), $response, 'Failed to get the resourceFile');
+    }
+
+    /**
+     * @dataProvider getRead
+     */
+    public function testReadStream($path, $sourceFile, $expected)
+    {
+        $responseClient = $this->createMock(GetBlobResult::class);
+        $responseClient->expects(self::any())
+            ->method('getContentStream')
+            ->willReturn(fopen($sourceFile, 'r'));
+        $blobClient = $this->createMock(BlobRestProxy::class);
+        $blobClient->expects(self::any())
+            ->method('getBlob')
+            ->willReturn($responseClient);
+        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+        $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
+        $response = $service->readStream($path);
+
+        $this->assertTrue((is_resource($response)), 'Failing to get the resource');
+    }
+
+    public function getRead(): array
+    {
+        return [
+            'fileExists' => [
+                'path' => sprintf('mt/%s', self::FILE_TEST),
+                'sourceFile' => sprintf('%s/%s/%s', __DIR__, 'files', self::FILE_TEST),
+                'expected' => fopen(sprintf('%s/%s/%s', __DIR__, 'files', self::FILE_TEST), 'r')
+            ],
+            'fileDoesNotExists' => [
+                'path' => self::FILE_TEST,
+                'sourceFile' => sprintf('%s/%s/%s', __DIR__, 'files', self::FILE_TEST),
+                'expected' => fopen(sprintf('%s/%s/%s', __DIR__, 'files', self::FILE_TEST), 'r')
+            ],
+        ];
+    }
 
 
     public function tearDown(): void
