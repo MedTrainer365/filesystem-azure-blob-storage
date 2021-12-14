@@ -18,6 +18,10 @@ class AzureBlobStorageAdapterTest extends TestCase
     public function setUp(): void
     {
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->logger->expects(self::any())
+            ->method('debug');
+        $this->logger->expects(self::any())
+            ->method('error');
         parent::setUp();
     }
 
@@ -99,24 +103,33 @@ class AzureBlobStorageAdapterTest extends TestCase
      */
     public function testWriteStream($destinationFile, $sourceFile, $config)
     {
-        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
-        $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
+        $responseClient = $this->createMock(PutBlobResult::class);
+        $responseClient->expects(self::any())
+            ->method('getLastModified')
+            ->willReturn(new \DateTimeImmutable());
+        ;
+        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+        $blobClient = $this->createMock(BlobRestProxy::class);
+        $blobClient->expects(self::any())
+            ->method('createBlockBlob')
+            ->willReturn($responseClient);
+        $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default', '');
         $statusWrite = true;
 
         try {
-            $service->writeStream($destinationFile, $sourceFile, new Config($config));
+            $service->writeStream($destinationFile, fopen($sourceFile, 'r'), new Config($config));
         } catch (\Exception $exception) {
             $statusWrite = false;
         }
 
-        $this->assertTrue($statusWrite);
+        $this->assertTrue($statusWrite, 'Failing the upload of a file');
     }
 
     public function getDataWrite(): array
     {
         return [
             'testWithOutMime' => [
-                'destinationFile' => 'file_demo.png',
+                'destinationFile' => 'jesus/file_demo.png',
                 'sourceFile' => sprintf('%s/%s', __DIR__, 'files/test_image.png'),
                 'configuration' => []
             ],

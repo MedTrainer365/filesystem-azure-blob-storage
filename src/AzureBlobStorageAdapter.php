@@ -3,11 +3,13 @@
 namespace MedTrainer\Flysystem\AzureBlobStorage;
 
 use Exception;
+use GuzzleHttp\Psr7\Utils;
 use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\InvalidVisibilityProvided;
+use League\Flysystem\PathPrefixer;
 use League\Flysystem\UnableToCopyFile;
 use League\Flysystem\UnableToCreateDirectory;
 use League\Flysystem\UnableToDeleteDirectory;
@@ -26,6 +28,7 @@ use MicrosoftAzure\Storage\Blob\Models\PublicAccessType;
 use MicrosoftAzure\Storage\Common\Exceptions\ServiceException;
 use Psr\Log\LoggerInterface;
 
+
 final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
 {
     protected static $metaOptions = [
@@ -39,11 +42,14 @@ final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
     /** @var BlobRestProxy */
     private $client;
 
+    /** @var LoggerInterface */
+    private $logger;
+
     /** @var string */
     private $container;
 
-    /** @var LoggerInterface */
-    private $logger;
+    /** @var PathPrefixer */
+    private $prefixer;
 
     /** @var bool|mixed  */
     private $publicAccess = false;
@@ -66,6 +72,7 @@ final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
         BlobRestProxy $client,
         LoggerInterface $logger,
         $container = 'default',
+        $prefix = '',
         $publicAccess = false,
         array $metaData = [],
         MimeTypeDetector $mimeTypeDetector = null
@@ -75,6 +82,7 @@ final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
         $this->container = $container;
         $this->publicAccess = $publicAccess;
         $this->metaData = $metaData;
+        $this->prefixer = new PathPrefixer($prefix);
         $this->mimeTypeDetector = $mimeTypeDetector ? : new FinfoMimeTypeDetector();
     }
 
@@ -82,10 +90,12 @@ final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
     {
         $response = true;
         try {
-            $this->client->getBlob('default', $path);
+            $destination = $this->prefixer->prefixPath($path);
+            $this->logger->debug(sprintf('file exists from: %s', $destination));
+            $this->client->getBlob('default', $destination);
         } catch (Exception $exception) {
             $response = false;
-            $this->logger->debug($exception->getMessage());
+            $this->logger->error($exception->getMessage());
         }
 
         return $response;
@@ -93,7 +103,7 @@ final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
 
     public function write(string $path, string $contents, Config $config): void
     {
-        $this->upload($path, $contents, $config) + compact('contents');
+        $this->upload($path, $contents, $config);
     }
 
     protected function upload($path, $contents, Config $config): array
@@ -102,23 +112,34 @@ final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
             $this->initialize();
         }
 
-        $destination = $path;
+        $destination = $this->prefixer->prefixPath($path);
+        $this->logger->debug(sprintf('Uploading to: %s', $destination));
 
         $options = $this->createOptionsFromConfig($config);
+        $stream = $contents;
 
         if (empty($options->getContentType())) {
-            $options->setContentType($this->mimeTypeDetector->detectMimeTypeFromFile($contents));
+            if (!is_resource($stream)) {
+                $options->setContentType($this->mimeTypeDetector->detectMimeTypeFromFile($contents));
+            } else {
+                $metaData = stream_get_meta_data($stream);
+                $options->setContentType($this->mimeTypeDetector->detectMimeTypeFromFile($metaData['uri']));
+            }
+        }
+
+        if (!is_resource($stream)) {
+            $stream = Utils::tryFopen($contents, "r");
         }
 
         $response = $this->client->createBlockBlob(
             $this->container,
             $destination,
-            $contents,
+            $stream,
             $options
         );
 
         return [
-            'path' => $path,
+            'path' => $destination,
             'timestamp' => $response->getLastModified()->getTimestamp(),
             'type' => 'file',
         ];
