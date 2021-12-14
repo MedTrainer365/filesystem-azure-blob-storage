@@ -16,15 +16,26 @@ use League\Flysystem\UnableToMoveFile;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToRetrieveMetadata;
 use League\Flysystem\UnableToWriteFile;
+use League\MimeTypeDetection\FinfoMimeTypeDetector;
+use League\MimeTypeDetection\MimeTypeDetector;
 use MicrosoftAzure\Storage\Blob\BlobRestProxy;
+use MicrosoftAzure\Storage\Blob\Models\CreateBlobBlockOptions;
+use MicrosoftAzure\Storage\Blob\Models\CreateBlockBlobOptions;
 use MicrosoftAzure\Storage\Blob\Models\CreateContainerOptions;
 use MicrosoftAzure\Storage\Blob\Models\PublicAccessType;
 use MicrosoftAzure\Storage\Common\Exceptions\ServiceException;
 use Psr\Log\LoggerInterface;
-use SebastianBergmann\CodeCoverage\Util;
 
 final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
 {
+    protected static $metaOptions = [
+        'CacheControl',
+        'ContentType',
+        'Metadata',
+        'ContentLanguage',
+        'ContentEncoding',
+    ];
+
     /** @var BlobRestProxy */
     private $client;
 
@@ -40,6 +51,9 @@ final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
     /** @var array */
     private $metaData = [];
 
+    /** @var MimeTypeDetector */
+    private $mimeTypeDetector;
+
     /** @var bool */
     private $booted = false;
 
@@ -53,20 +67,22 @@ final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
         LoggerInterface $logger,
         $container = 'default',
         $publicAccess = false,
-        $metaData = []
+        array $metaData = [],
+        MimeTypeDetector $mimeTypeDetector = null
     ) {
         $this->client = $client;
         $this->logger = $logger;
         $this->container = $container;
         $this->publicAccess = $publicAccess;
         $this->metaData = $metaData;
+        $this->mimeTypeDetector = $mimeTypeDetector ? : new FinfoMimeTypeDetector();
     }
 
     public function fileExists(string $path): bool
     {
         $response = true;
         try {
-           $this->client->getBlob('default', $path);
+            $this->client->getBlob('default', $path);
         } catch (Exception $exception) {
             $response = false;
             $this->logger->debug($exception->getMessage());
@@ -77,48 +93,53 @@ final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
 
     public function write(string $path, string $contents, Config $config): void
     {
-        $response = $this->upload($path, $contents, $config) + compact('contents');
-
+        $this->upload($path, $contents, $config) + compact('contents');
     }
 
     protected function upload($path, $contents, Config $config): array
     {
-        $destination = $this->applyPathPrefix($path);
+        if (!$this->booted) {
+            $this->initialize();
+        }
 
+        $destination = $path;
 
-//        if (empty($options->getContentType())) {
-//            $options->setContentType(Util::guessMimeType($path, $contents));
-//        }
+        $options = $this->createOptionsFromConfig($config);
 
-        /**
-         * We manually create the stream to prevent it from closing the resource
-         * in its destructor.
-         */
-//        $stream = stream_for($contents);
+        if (empty($options->getContentType())) {
+            $options->setContentType($this->mimeTypeDetector->detectMimeTypeFromFile($contents));
+        }
+
         $response = $this->client->createBlockBlob(
             $this->container,
             $destination,
-            $contents
+            $contents,
+            $options
         );
-
-//        $stream->detach();
 
         return [
             'path' => $path,
-            'timestamp' => (int) $response->getLastModified()->getTimestamp(),
-//            'dirname' => Util::dirname($path),
+            'timestamp' => $response->getLastModified()->getTimestamp(),
             'type' => 'file',
         ];
     }
 
     public function writeStream(string $path, $contents, Config $config): void
     {
-        // TODO: Implement writeStream() method.
+        $this->upload($path, $contents, $config);
     }
 
     public function read(string $path): string
     {
-        // TODO: Implement read() method.
+        $response = $this->readStream($path);
+        if (!isset($response['stream']) || ! is_resource($response['stream'])) {
+            return $response;
+        }
+
+        $response['contents'] = stream_get_contents($response['stream']);
+        unset($response['stream']);
+
+        return $response;
     }
 
     public function readStream(string $path)
@@ -181,6 +202,24 @@ final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
         // TODO: Implement copy() method.
     }
 
+    private function createOptionsFromConfig(Config $config): CreateBlockBlobOptions
+    {
+        $options = $config->get('blobOptions', new CreateBlockBlobOptions());
+        foreach (static::$metaOptions as $option) {
+            if (!$config->get($option)) {
+                continue;
+            }
+
+            call_user_func([$options, "set$option"], $config->get($option));
+        }
+
+        if ($mimetype = $config->get('mimetype')) {
+            $options->setContentType($mimetype);
+        }
+
+        return $options;
+    }
+
     private function initialize():void
     {
         if (!$this->booted) {
@@ -214,15 +253,6 @@ final class AzureBlobStorageAdapter extends Adapter implements FilesystemAdapter
             $this->client->createContainer($container, $createContainerOptions);
         } catch (ServiceException $e) {
             $this->logger->error($e->getErrorMessage());
-            throw new Exception('Unable to create the space');
         }
     }
-
-
-
-//    protected function upload($path, $body, Config $config)
-//    {
-//        $options = $this->getOptionsFromConfig($config);
-//        $acl = array_key_exists('ACL', $options) ? $options['ACL'] : 'private';
-//    }
 }

@@ -31,6 +31,7 @@
     "require": {
         "php": ">=7.2",
         "league/flysystem": "^2.0",
+        "league/mime-type-detection": "^1.9",
         "microsoft/azure-storage-blob": "*",
         "psr/log": "^1.1"
     },
