@@ -6,6 +6,7 @@ namespace MedTrainer\Flysystem\AzureBlobStorage;
 
 use Exception;
 use GuzzleHttp\Psr7\Utils;
+use http\Client;
 use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
@@ -26,7 +27,9 @@ use MicrosoftAzure\Storage\Blob\BlobRestProxy;
 use MicrosoftAzure\Storage\Blob\Models\BlobProperties;
 use MicrosoftAzure\Storage\Blob\Models\CreateBlockBlobOptions;
 use MicrosoftAzure\Storage\Blob\Models\CreateContainerOptions;
+use MicrosoftAzure\Storage\Blob\Models\GetBlobPropertiesResult;
 use MicrosoftAzure\Storage\Blob\Models\GetBlobResult;
+use MicrosoftAzure\Storage\Blob\Models\ListBlobsOptions;
 use MicrosoftAzure\Storage\Blob\Models\PublicAccessType;
 use MicrosoftAzure\Storage\Common\Exceptions\ServiceException;
 use Psr\Log\LoggerInterface;
@@ -93,7 +96,7 @@ final class AzureBlobStorageAdapter implements FilesystemAdapter
         try {
             $destination = $this->prefixer->prefixPath($path);
             $this->logger->debug(sprintf('file exists from: %s', $destination));
-            $this->client->getBlob('default', $destination);
+            $this->client->getBlob($this->container, $destination);
         } catch (Exception $exception) {
             $response = false;
             $this->logger->error($exception->getMessage());
@@ -109,10 +112,7 @@ final class AzureBlobStorageAdapter implements FilesystemAdapter
 
     protected function upload($path, $contents, Config $config): array
     {
-        if (!$this->booted) {
-            $this->initialize();
-        }
-
+        $this->initialize();
         $destination = $this->prefixer->prefixPath($path);
         $this->logger->debug(sprintf('Uploading to: %s', $destination));
 
@@ -167,6 +167,7 @@ final class AzureBlobStorageAdapter implements FilesystemAdapter
 
     public function delete(string $path): void
     {
+        $this->initialize();
         $location = $this->prefixer->prefixPath($path);
         try {
             $this->client->deleteBlob($this->container, $location);
@@ -176,39 +177,54 @@ final class AzureBlobStorageAdapter implements FilesystemAdapter
 
     }
 
-    public function deleteDirectory(string $path): void
+    public function deleteDirectory(string $dirname): void
     {
-        // TODO: Implement deleteDirectory() method.
+        $this->initialize();
+        $dirLocation = $this->prefixer->prefixDirectoryPath($dirname);
+
+        $options = new ListBlobsOptions();
+        $options->setPrefix($dirLocation);
+        $listResults = $this->client->listBlobs($this->container, $options);
+
+        foreach ($listResults->getBlobs() as $blob) {
+            $this->client->deleteBlob($this->container, $blob->getName());
+        }
     }
 
     public function createDirectory(string $path, Config $config): void
     {
-        // TODO: Implement createDirectory() method.
+        throw new UnableToCreateDirectory('Cant\'t  create a folder');
     }
 
     public function setVisibility(string $path, string $visibility): void
     {
-        // TODO: Implement setVisibility() method.
+        throw new InvalidVisibilityProvided();
     }
 
     public function visibility(string $path): FileAttributes
     {
-        // TODO: Implement visibility() method.
+        throw new InvalidVisibilityProvided();
     }
 
     public function mimeType(string $path): FileAttributes
     {
-        // TODO: Implement mimeType() method.
+        $properties = $this->getMetaData($path);
+
+        return $this->normalizeProperties($properties, $path);
     }
 
     public function lastModified(string $path): FileAttributes
     {
-        // TODO: Implement lastModified() method.
+        $properties = $this->getMetaData($path);
+
+        return $this->normalizeProperties($properties, $path);
     }
 
     public function fileSize(string $path): FileAttributes
     {
-        // TODO: Implement fileSize() method.
+        $properties = $this->getMetaData($path);
+
+        return $this->normalizeProperties($properties, $path);
     }
 
     public function listContents(string $path, bool $deep): iterable
@@ -224,6 +240,35 @@ final class AzureBlobStorageAdapter implements FilesystemAdapter
     public function copy(string $source, string $destination, Config $config): void
     {
         // TODO: Implement copy() method.
+    }
+
+    private function getMetaData(string $path): GetBlobPropertiesResult
+    {
+        $this->initialize();
+
+        $location = $this->prefixer->prefixPath($path);
+
+        return $this->client->getBlobProperties(
+                $this->container,
+                $location
+            );
+    }
+
+    private function normalizeProperties(
+        GetBlobPropertiesResult $blobPropertiesResult,
+        string $path
+    ): FileAttributes {
+        $properties = $blobPropertiesResult->getProperties();
+
+        return new FileAttributes(
+            $path,
+            $properties->getContentLength(),
+        null,
+            (int) $properties->getLastModified()->format('U'),
+            $properties->getContentType(), [
+
+            ]
+        );
     }
 
     private function createOptionsFromConfig(Config $config): CreateBlockBlobOptions
@@ -249,6 +294,17 @@ final class AzureBlobStorageAdapter implements FilesystemAdapter
         if (!$this->booted) {
             $this->createContainer($this->container, $this->publicAccess, $this->metaData);
         }
+    }
+
+    private function readObject(string $path): GetBlobResult
+    {
+        $this->initialize();
+        $location = $this->prefixer->prefixPath($path);
+
+        return $this->client->getBlob(
+            $this->container,
+            $location
+        );
     }
 
     private function createContainer(string $container, bool $publicAccess = false, array $metaData = []):void
@@ -280,13 +336,5 @@ final class AzureBlobStorageAdapter implements FilesystemAdapter
         }
     }
 
-    private function readObject(string $path): GetBlobResult
-    {
-        $location = $this->prefixer->prefixPath($path);
 
-        return $this->client->getBlob(
-            $this->container,
-            $location
-        );
-    }
 }

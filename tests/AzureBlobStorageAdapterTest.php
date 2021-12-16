@@ -5,9 +5,11 @@ namespace MedTrainer\Flysystem\AzureBlobStorage\Tests;
 
 use Exception;
 use League\Flysystem\Config;
+use League\Flysystem\FileAttributes;
 use MedTrainer\Flysystem\AzureBlobStorage\AzureBlobStorageAdapter;
 use MicrosoftAzure\Storage\Blob\BlobRestProxy;
 use MicrosoftAzure\Storage\Blob\Models\GetBlobResult;
+use MicrosoftAzure\Storage\Blob\Models\ListBlobsResult;
 use MicrosoftAzure\Storage\Blob\Models\PutBlobResult;
 use MicrosoftAzure\Storage\Common\Exceptions\ServiceException;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -18,6 +20,8 @@ use Psr\Log\LoggerInterface;
 class AzureBlobStorageAdapterTest extends TestCase
 {
     const FILE_TEST = 'test_image.png';
+
+    const DIR_TEST = 'mt';
 
     /** @var MockObject|LoggerInterface  */
     private $logger;
@@ -92,6 +96,7 @@ class AzureBlobStorageAdapterTest extends TestCase
         $blobClient->expects(self::any())
             ->method('createBlockBlob')
             ->willReturn($responseClient);
+        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
         $statusWrite = true;
 
@@ -182,7 +187,7 @@ class AzureBlobStorageAdapterTest extends TestCase
         $blobClient->expects(self::any())
             ->method('getBlob')
             ->willReturn($responseClient);
-//        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+        //$blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
         $response = $service->readStream($path);
 
@@ -192,7 +197,7 @@ class AzureBlobStorageAdapterTest extends TestCase
     public function getRead(): array
     {
         return [
-            'fileExists' => [
+            'fileExist' => [
                 'path' => sprintf('mt/%s', self::FILE_TEST),
                 'sourceFile' => sprintf('%s/%s/%s', __DIR__, 'files', self::FILE_TEST),
                 'expected' => fopen(sprintf('%s/%s/%s', __DIR__, 'files', self::FILE_TEST), 'r')
@@ -212,7 +217,6 @@ class AzureBlobStorageAdapterTest extends TestCase
     {
         $blobClient = $this->createMock(BlobRestProxy::class);
         if ($exception) {
-
             $responseInterface = $this->createMock(ResponseInterface::class);
             $exceptionClass = new ServiceException($responseInterface);
             $blobClient->expects(self::any())
@@ -223,13 +227,41 @@ class AzureBlobStorageAdapterTest extends TestCase
                 ->method('deleteBlob')
                 ->willReturn(null);
         }
+
         if ($exception) {
             $this->expectException(Exception::class);
         }
+
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
         $response = true;
         $service->delete(self::FILE_TEST);
         $this->assertTrue($response);
+    }
+
+    public function testDeleteDir()
+    {
+        $list = ListBlobsResult::create([
+            'Blobs' => [
+                [
+                    'Name' => self::FILE_TEST
+                ]
+            ]
+        ]);
+
+        $blobClient = $this->createMock(BlobRestProxy::class);
+        $blobClient->expects(self::any())
+            ->method('listBlobs')
+            ->willReturn($list);
+        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+        $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default', 'adfasdf');
+        $assertion = true;
+        try {
+            $service->deleteDirectory(self::DIR_TEST);
+        } catch (Exception $exception) {
+            $assertion = false;
+        }
+
+        $this->assertTrue($assertion, "Failing the delete of the folder");
     }
 
     public function getDelete(): array
@@ -244,6 +276,22 @@ class AzureBlobStorageAdapterTest extends TestCase
         ];
     }
 
+    public function testCreateDirectory()
+    {
+        // Azure doesnt provide create a folder
+        $this->expectNotToPerformAssertions();
+        $blobClient = $this->createMock(BlobRestProxy::class);
+        $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
+        $service->createDirectory(self::DIR_TEST, new Config());
+    }
+
+    public function testGetMime()
+    {
+        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+        $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
+        $response = $service->mimeType(self::FILE_TEST);
+        $this->assertInstanceOf(FileAttributes::class, $response);
+    }
 
     public function tearDown(): void
     {
