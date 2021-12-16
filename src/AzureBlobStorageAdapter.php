@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace MedTrainer\Flysystem\AzureBlobStorage;
 
 use Exception;
@@ -7,7 +9,7 @@ use GuzzleHttp\Psr7\Utils;
 use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
-use League\Flysystem\FilesystemException;
+
 use League\Flysystem\InvalidVisibilityProvided;
 use League\Flysystem\PathPrefixer;
 use League\Flysystem\UnableToCopyFile;
@@ -63,8 +65,6 @@ final class AzureBlobStorageAdapter implements FilesystemAdapter
 
     /** @var bool */
     private $booted = false;
-
-    private $maxResultsForContentsListing = 5000;
 
     /** @var array */
     protected $options = [];
@@ -167,7 +167,13 @@ final class AzureBlobStorageAdapter implements FilesystemAdapter
 
     public function delete(string $path): void
     {
-        // TODO: Implement delete() method.
+        $location = $this->prefixer->prefixPath($path);
+        try {
+            $this->client->deleteBlob($this->container, $location);
+        } catch (ServiceException $exception) {
+            throw new Exception('File not found');
+        }
+
     }
 
     public function deleteDirectory(string $path): void

@@ -1,14 +1,18 @@
 <?php
+declare(strict_types=1);
 
 namespace MedTrainer\Flysystem\AzureBlobStorage\Tests;
 
+use Exception;
 use League\Flysystem\Config;
 use MedTrainer\Flysystem\AzureBlobStorage\AzureBlobStorageAdapter;
 use MicrosoftAzure\Storage\Blob\BlobRestProxy;
 use MicrosoftAzure\Storage\Blob\Models\GetBlobResult;
 use MicrosoftAzure\Storage\Blob\Models\PutBlobResult;
+use MicrosoftAzure\Storage\Common\Exceptions\ServiceException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Log\LoggerInterface;
 
 class AzureBlobStorageAdapterTest extends TestCase
@@ -50,7 +54,7 @@ class AzureBlobStorageAdapterTest extends TestCase
         } else {
             $blobClient->expects(self::any())
                 ->method('getBlob')
-                ->willThrowException(new \Exception('File not found'));
+                ->willThrowException(new Exception('File not found'));
         }
 
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
@@ -93,7 +97,7 @@ class AzureBlobStorageAdapterTest extends TestCase
 
         try {
             $service->write($destinationFile, $sourceFile, new Config($config));
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             $statusWrite = false;
         }
 
@@ -120,7 +124,7 @@ class AzureBlobStorageAdapterTest extends TestCase
 
         try {
             $service->writeStream($destinationFile, fopen($sourceFile, 'r'), new Config($config));
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             $statusWrite = false;
         }
 
@@ -178,7 +182,7 @@ class AzureBlobStorageAdapterTest extends TestCase
         $blobClient->expects(self::any())
             ->method('getBlob')
             ->willReturn($responseClient);
-        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+//        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
         $response = $service->readStream($path);
 
@@ -197,6 +201,45 @@ class AzureBlobStorageAdapterTest extends TestCase
                 'path' => self::FILE_TEST,
                 'sourceFile' => sprintf('%s/%s/%s', __DIR__, 'files', self::FILE_TEST),
                 'expected' => fopen(sprintf('%s/%s/%s', __DIR__, 'files', self::FILE_TEST), 'r')
+            ],
+        ];
+    }
+
+    /**
+     * @dataProvider getDelete
+     */
+    public function testDelete($exception)
+    {
+        $blobClient = $this->createMock(BlobRestProxy::class);
+        if ($exception) {
+
+            $responseInterface = $this->createMock(ResponseInterface::class);
+            $exceptionClass = new ServiceException($responseInterface);
+            $blobClient->expects(self::any())
+                ->method('deleteBlob')
+                ->willThrowException($exceptionClass);
+        } else {
+            $blobClient->expects(self::any())
+                ->method('deleteBlob')
+                ->willReturn(null);
+        }
+        if ($exception) {
+            $this->expectException(Exception::class);
+        }
+        $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
+        $response = true;
+        $service->delete(self::FILE_TEST);
+        $this->assertTrue($response);
+    }
+
+    public function getDelete(): array
+    {
+        return [
+            'fileFound' => [
+                'exception' => false
+            ],
+            'fileNotFound' => [
+                'exception' => true
             ],
         ];
     }
