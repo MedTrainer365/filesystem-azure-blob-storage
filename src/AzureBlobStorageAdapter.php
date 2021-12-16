@@ -1,30 +1,20 @@
 <?php
-
 declare(strict_types=1);
 
 namespace MedTrainer\Flysystem\AzureBlobStorage;
 
 use Exception;
 use GuzzleHttp\Psr7\Utils;
-use http\Client;
 use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
-
 use League\Flysystem\InvalidVisibilityProvided;
 use League\Flysystem\PathPrefixer;
 use League\Flysystem\UnableToCopyFile;
 use League\Flysystem\UnableToCreateDirectory;
-use League\Flysystem\UnableToDeleteDirectory;
-use League\Flysystem\UnableToDeleteFile;
-use League\Flysystem\UnableToMoveFile;
-use League\Flysystem\UnableToReadFile;
-use League\Flysystem\UnableToRetrieveMetadata;
-use League\Flysystem\UnableToWriteFile;
 use League\MimeTypeDetection\FinfoMimeTypeDetector;
 use League\MimeTypeDetection\MimeTypeDetector;
 use MicrosoftAzure\Storage\Blob\BlobRestProxy;
-use MicrosoftAzure\Storage\Blob\Models\BlobProperties;
 use MicrosoftAzure\Storage\Blob\Models\CreateBlockBlobOptions;
 use MicrosoftAzure\Storage\Blob\Models\CreateContainerOptions;
 use MicrosoftAzure\Storage\Blob\Models\GetBlobPropertiesResult;
@@ -33,7 +23,6 @@ use MicrosoftAzure\Storage\Blob\Models\ListBlobsOptions;
 use MicrosoftAzure\Storage\Blob\Models\PublicAccessType;
 use MicrosoftAzure\Storage\Common\Exceptions\ServiceException;
 use Psr\Log\LoggerInterface;
-
 
 final class AzureBlobStorageAdapter implements FilesystemAdapter
 {
@@ -229,26 +218,37 @@ final class AzureBlobStorageAdapter implements FilesystemAdapter
 
     public function listContents(string $path, bool $deep): iterable
     {
-        $response = [];
         $dirLocation = $this->prefixer->prefixDirectoryPath($path);
         $options = new ListBlobsOptions();
         $options->setPrefix($dirLocation);
         $listResults = $this->client->listBlobs($this->container, $options);
 
-        foreach ($listResults->getBlobs() as $blob) {
-        }
-
-        return $response;
+        return $listResults->getBlobs();
     }
 
     public function move(string $source, string $destination, Config $config): void
     {
-        // TODO: Implement move() method.
+        $this->copy($source, $destination, $config);
+        $this->delete($source);
     }
 
     public function copy(string $source, string $destination, Config $config): void
     {
-        // TODO: Implement copy() method.
+        $this->initialize();
+        $this->logger->debug("copy from the location {$source}");
+        try {
+            $sourceLocation = $this->prefixer->prefixPath($source);
+            $destinationLocation = $this->prefixer->prefixPath($destination);
+            $this->client->copyBlob(
+                $this->container,
+                $destinationLocation,
+                $this->container,
+                $sourceLocation
+            );
+        } catch (ServiceException $exception) {
+            $this->logger->error("Error from the location {$source}");
+            throw new UnableToCopyFile("Unable to find the file {$source}");
+        }
     }
 
     private function getMetaData(string $path): GetBlobPropertiesResult
@@ -308,6 +308,7 @@ final class AzureBlobStorageAdapter implements FilesystemAdapter
     private function readObject(string $path): GetBlobResult
     {
         $this->initialize();
+        $this->logger->debug("Reading the location {$path}");
         $location = $this->prefixer->prefixPath($path);
 
         return $this->client->getBlob(

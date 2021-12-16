@@ -6,6 +6,8 @@ namespace MedTrainer\Flysystem\AzureBlobStorage\Tests;
 use Exception;
 use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
+use League\Flysystem\UnableToCopyFile;
+use League\Flysystem\UnableToCreateDirectory;
 use MedTrainer\Flysystem\AzureBlobStorage\AzureBlobStorageAdapter;
 use MicrosoftAzure\Storage\Blob\BlobRestProxy;
 use MicrosoftAzure\Storage\Blob\Models\GetBlobPropertiesResult;
@@ -280,7 +282,7 @@ class AzureBlobStorageAdapterTest extends TestCase
     public function testCreateDirectory()
     {
         // Azure doesnt provide create a folder
-        $this->expectNotToPerformAssertions();
+        $this->expectException(UnableToCreateDirectory::class);
         $blobClient = $this->createMock(BlobRestProxy::class);
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
         $service->createDirectory(self::DIR_TEST, new Config());
@@ -324,9 +326,150 @@ class AzureBlobStorageAdapterTest extends TestCase
         $this->assertInstanceOf(FileAttributes::class, $response);
     }
 
-    public function testListContents()
-    {
+    //    public function testListContents()
+    //    {
+    //        $responseClient = $this->createMock(GetBlobResult::class);
+    //        $blobClient = $this->createMock(BlobRestProxy::class);
+    //        $blobClient->expects(self::any())
+    //            ->method('listBlobs')
+    //            ->willReturn($responseClient);
+    ////        $blobClient->expects(self::any())
+    ////            ->method('getBlob')
+    ////            ->willReturn(ListBlobsResult::create([
+    ////                [
+    ////                    "@attributes" => [
+    ////                        "ServiceEndpoint" => "http://azurite:10000/devstoreaccount1",
+    ////                        "ContainerName" => "default",
+    ////                    ],
+    ////                    "Prefix" => null,
+    ////                    "Marker" => null,
+    ////                    "MaxResults" => "5000",
+    ////                    "Delimiter" => null,
+    ////                    "Blobs" => [
+    ////                        "Blob" => [
+    ////                            [
+    ////                                "Name" => "mt/test/index.png",
+    ////                                "Properties" => [
+    ////                                    "Creation-Time" => "Thu, 16 Dec 2021 18:46:37 GMT",
+    ////                                    "Last-Modified" => "Thu, 16 Dec 2021 18:46:37 GMT",
+    ////                                    "Etag" => "0x1BFFA769D7D9830",
+    ////                                    "Content-Length" => "4445",
+    ////                                    "Content-Type" => "image/png",
+    ////                                    "Content-Encoding" => null,
+    ////                                    "Content-Language" => null,
+    ////                                    "Content-MD5" => "YDE4L4f/zE+XvOicUOGk0g==",
+    ////                                    "Content-Disposition" => null,
+    ////                                    "Cache-Control" => null,
+    ////                                    "BlobType" => "BlockBlob",
+    ////                                    "LeaseStatus" => "unlocked",
+    ////                                    "LeaseState" => "available",
+    ////                                    "ServerEncrypted" => "true",
+    ////                                    "AccessTier" => "Hot",
+    ////                                    "AccessTierInferred" => "true",
+    ////                                    "AccessTierChangeTime" => "Thu, 16 Dec 2021 18:46:37 GMT",
+    ////                                ],
+    ////                            ],
+    ////                            [
+    ////                                "Name" => "mt/test_image.png",
+    ////                                "Properties" => [
+    ////                                    "Creation-Time" => "Thu, 16 Dec 2021 17:42:12 GMT",
+    ////                                    "Last-Modified" => "Thu, 16 Dec 2021 17:42:12 GMT",
+    ////                                    "Etag" => "0x2195366C7689E80",
+    ////                                    "Content-Length" => "4445",
+    ////                                    "Content-Type" => "image/png",
+    ////                                    "Content-MD5" => "YDE4L4f/zE+XvOicUOGk0g==",
+    ////                                    "BlobType" => "BlockBlob",
+    ////                                    "LeaseStatus" => "unlocked",
+    ////                                    "LeaseState" => "available",
+    ////                                    "ServerEncrypted" => "true",
+    ////                                    "AccessTier" => "Hot",
+    ////                                    "AccessTierInferred" => "true",
+    ////                                    "AccessTierChangeTime" => "Thu, 16 Dec 2021 17:42:12 GMT",
+    ////                                ],
+    ////                            ],
+    ////                            [
+    ////                                "Name" => "test_image.png",
+    ////                                "Properties" => [
+    ////                                    "Creation-Time" => "Thu, 16 Dec 2021 17:42:12 GMT",
+    ////                                    "Last-Modified" => "Thu, 16 Dec 2021 17:42:12 GMT",
+    ////                                    "Etag" => "0x1B6041BF1747F80",
+    ////                                    "Content-Length" => "4445",
+    ////                                    "Content-Type" => "image/png",
+    ////                                    "Content-MD5" => "YDE4L4f/zE+XvOicUOGk0g==",
+    ////                                    "BlobType" => "BlockBlob",
+    ////                                    "LeaseStatus" => "unlocked",
+    ////                                    "LeaseState" => "available",
+    ////                                    "ServerEncrypted" => "true",
+    ////                                    "AccessTier" => "Hot",
+    ////                                    "AccessTierInferred" => "true",
+    ////                                    "AccessTierChangeTime" => "Thu, 16 Dec 2021 17:42:12 GMT",
+    ////                                ],
+    ////                            ],
+    ////                        ],
+    ////                    ],
+    ////                    "NextMarker" => null,
+    ////                ]
+    ////            ]));
+    ////        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+    //        $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
+    //        $response = $service->listContents('', true);
+    //        $this->assertIsIterable($response, 'Error getting the list of the content');
+    //    }
 
+    /**
+     * @dataProvider getCopyFiles
+     */
+    public function testCopy($exception)
+    {
+        $blobClient = $this->createMock(BlobRestProxy::class);
+        if ($exception) {
+            $blobClient->expects(self::any())
+                ->method('copyBlob')
+                ->willThrowException(new UnableToCopyFile(""));
+            $this->expectException(UnableToCopyFile::class);
+        } else {
+            $blobClient->expects(self::any())
+                ->method('copyBlob')
+                ->willReturn(null);
+            $this->expectNotToPerformAssertions();
+        }
+
+        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+        $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
+        $service->copy(self::FILE_TEST, 'test.png', new Config());
+    }
+
+    /**
+     * @dataProvider getCopyFiles
+     */
+    public function testMove($exception)
+    {
+        $blobClient = $this->createMock(BlobRestProxy::class);
+        if ($exception) {
+            $blobClient->expects(self::any())
+                ->method('copyBlob')
+                ->willThrowException(new UnableToCopyFile(""));
+            $this->expectException(UnableToCopyFile::class);
+        } else {
+            $blobClient->expects(self::any())
+                ->method('copyBlob')
+                ->willReturn(null);
+            $this->expectNotToPerformAssertions();
+        }
+
+        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+        $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
+        $service->move(self::FILE_TEST, 'test.png', new Config());
+    }
+
+
+    public function getCopyFiles(): array
+    {
+        return [
+            'withException' => ['exception' => false],
+            'withoutException' => ['exception' => true],
+
+        ];
     }
 
     public function tearDown(): void
