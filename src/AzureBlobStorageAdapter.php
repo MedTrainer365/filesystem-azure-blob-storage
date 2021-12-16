@@ -229,7 +229,16 @@ final class AzureBlobStorageAdapter implements FilesystemAdapter
 
     public function listContents(string $path, bool $deep): iterable
     {
-        // TODO: Implement listContents() method.
+        $response = [];
+        $dirLocation = $this->prefixer->prefixDirectoryPath($path);
+        $options = new ListBlobsOptions();
+        $options->setPrefix($dirLocation);
+        $listResults = $this->client->listBlobs($this->container, $options);
+
+        foreach ($listResults->getBlobs() as $blob) {
+        }
+
+        return $response;
     }
 
     public function move(string $source, string $destination, Config $config): void

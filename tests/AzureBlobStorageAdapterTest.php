@@ -8,6 +8,7 @@ use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
 use MedTrainer\Flysystem\AzureBlobStorage\AzureBlobStorageAdapter;
 use MicrosoftAzure\Storage\Blob\BlobRestProxy;
+use MicrosoftAzure\Storage\Blob\Models\GetBlobPropertiesResult;
 use MicrosoftAzure\Storage\Blob\Models\GetBlobResult;
 use MicrosoftAzure\Storage\Blob\Models\ListBlobsResult;
 use MicrosoftAzure\Storage\Blob\Models\PutBlobResult;
@@ -287,10 +288,45 @@ class AzureBlobStorageAdapterTest extends TestCase
 
     public function testGetMime()
     {
-        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+        $blobClient = $this->createMock(BlobRestProxy::class);
+        $blobClient->expects(self::any())
+            ->method('getBlobProperties')
+            ->willReturn(GetBlobPropertiesResult::create([
+                  'server' => "Azurite-Blob/3.14.3",
+                  'last-modified' => "Thu, 16 Dec 2021 17:42:12 GMT",
+                  'x-ms-creation-time' => "Thu, 16 Dec 2021 17:42:12 GMT",
+                  'x-ms-blob-type' => "BlockBlob",
+                  'x-ms-lease-state' => "available",
+                  'x-ms-lease-status' => "unlocked",
+                  'content-length' => "4445",
+                  'content-type' => "image/png",
+                  'etag' => "0x1B6041BF1747F80",
+                  'content-md5' => "YDE4L4f/zE+XvOicUOGk0g==",
+                  'x-ms-client-request-id' => "61bb8af65161c",
+                  'x-ms-request-id' => "aa5c1409-8868-4d76-8c7c-5e6254ead384",
+                  'x-ms-version' => "2020-10-02",
+                  'date' => "Thu, 16 Dec 2021 18:52:38 GMT",
+                  'accept-ranges' => "bytes",
+                  'x-ms-server-encrypted' => "true",
+                  'x-ms-access-tier' => "Hot",
+                  'x-ms-access-tier-inferred' => "true",
+                  'x-ms-access-tier-change-time' => "Thu, 16 Dec 2021 17:42:12 GMT",
+                  'connection' => "keep-alive",
+                  'keep-alive' => "timeout=5",
+                  'x-ms-continuation-location-mode' => "PrimaryOnly"
+            ]));
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
         $response = $service->mimeType(self::FILE_TEST);
         $this->assertInstanceOf(FileAttributes::class, $response);
+        $response = $service->lastModified(self::FILE_TEST);
+        $this->assertInstanceOf(FileAttributes::class, $response);
+        $response = $service->fileSize(self::FILE_TEST);
+        $this->assertInstanceOf(FileAttributes::class, $response);
+    }
+
+    public function testListContents()
+    {
+
     }
 
     public function tearDown(): void
