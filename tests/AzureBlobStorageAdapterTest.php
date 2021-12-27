@@ -99,7 +99,7 @@ class AzureBlobStorageAdapterTest extends TestCase
         $blobClient->expects(self::any())
             ->method('createBlockBlob')
             ->willReturn($responseClient);
-        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
         $statusWrite = true;
 
@@ -122,7 +122,7 @@ class AzureBlobStorageAdapterTest extends TestCase
             ->method('getLastModified')
             ->willReturn(new \DateTimeImmutable());
         ;
-        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+
         $blobClient = $this->createMock(BlobRestProxy::class);
         $blobClient->expects(self::any())
             ->method('createBlockBlob')
@@ -170,7 +170,7 @@ class AzureBlobStorageAdapterTest extends TestCase
         $blobClient->expects(self::any())
             ->method('getBlob')
             ->willReturn($responseClient);
-        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
         $response = $service->read($path);
 
@@ -190,7 +190,7 @@ class AzureBlobStorageAdapterTest extends TestCase
         $blobClient->expects(self::any())
             ->method('getBlob')
             ->willReturn($responseClient);
-        //$blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
         $response = $service->readStream($path);
 
@@ -405,7 +405,7 @@ class AzureBlobStorageAdapterTest extends TestCase
                     $blobClient->expects(self::any())
                         ->method('listBlobs')
                         ->willReturn($list);
-    //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+
             $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
             $response = $service->listContents('', true);
             $this->assertIsIterable($response, 'Error getting the list of the content');
@@ -418,20 +418,22 @@ class AzureBlobStorageAdapterTest extends TestCase
     {
         $blobClient = $this->createMock(BlobRestProxy::class);
         if ($exception) {
+            $responseInterface = $this->createMock(ResponseInterface::class);
+            $exceptionClass = new ServiceException($responseInterface);
             $blobClient->expects(self::any())
                 ->method('copyBlob')
-                ->willThrowException(new UnableToCopyFile(""));
+                ->willThrowException($exceptionClass);
             $this->expectException(UnableToCopyFile::class);
         } else {
             $blobClient->expects(self::any())
                 ->method('copyBlob')
                 ->willReturn(null);
-            $this->expectNotToPerformAssertions();
         }
 
-        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
+        $response = true;
         $service->copy(self::FILE_TEST, 'test.png', new Config());
+        $this->assertTrue($response);
     }
 
     /**
@@ -452,7 +454,6 @@ class AzureBlobStorageAdapterTest extends TestCase
             $this->expectNotToPerformAssertions();
         }
 
-        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
         $service->move(self::FILE_TEST, 'test.png', new Config());
     }
