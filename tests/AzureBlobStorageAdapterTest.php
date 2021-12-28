@@ -255,7 +255,7 @@ class AzureBlobStorageAdapterTest extends TestCase
         $blobClient->expects(self::any())
             ->method('listBlobs')
             ->willReturn($list);
-        //        $blobClient = BlobRestProxy::createBlobService('AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;');
+
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default', 'adfasdf');
         $assertion = true;
         try {
@@ -443,19 +443,23 @@ class AzureBlobStorageAdapterTest extends TestCase
     {
         $blobClient = $this->createMock(BlobRestProxy::class);
         if ($exception) {
+            $responseInterface = $this->createMock(ResponseInterface::class);
+            $exceptionClass = new ServiceException($responseInterface);
             $blobClient->expects(self::any())
                 ->method('copyBlob')
-                ->willThrowException(new UnableToCopyFile(""));
+                ->willThrowException($exceptionClass);
             $this->expectException(UnableToCopyFile::class);
         } else {
             $blobClient->expects(self::any())
                 ->method('copyBlob')
                 ->willReturn(null);
-            $this->expectNotToPerformAssertions();
+
         }
 
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
+        $response = true;
         $service->move(self::FILE_TEST, 'test.png', new Config());
+        $this->assertTrue($response);
     }
 
 
