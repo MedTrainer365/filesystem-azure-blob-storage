@@ -244,12 +244,34 @@ class AzureBlobStorageAdapterTest extends TestCase
     public function testDeleteDir()
     {
         $list = ListBlobsResult::create([
-            'Blobs' => [
-                [
-                    'Name' => self::FILE_TEST
+            "Blobs" => [
+                "Blob" => [
+                    [
+                        "Name" => self::FILE_TEST,
+                        "Properties" => [
+                            "Creation-Time" => "Thu, 16 Dec 2021 18:46:37 GMT",
+                            "Last-Modified" => "Thu, 16 Dec 2021 18:46:37 GMT",
+                            "Etag" => "0x1BFFA769D7D9830",
+                            "Content-Length" => "4445",
+                            "Content-Type" => "image/png",
+                            "Content-Encoding" => null,
+                            "Content-Language" => null,
+                            "Content-MD5" => "YDE4L4f/zE+XvOicUOGk0g==",
+                            "Content-Disposition" => null,
+                            "Cache-Control" => null,
+                            "BlobType" => "BlockBlob",
+                            "LeaseStatus" => "unlocked",
+                            "LeaseState" => "available",
+                            "ServerEncrypted" => "true",
+                            "AccessTier" => "Hot",
+                            "AccessTierInferred" => "true",
+                            "AccessTierChangeTime" => "Thu, 16 Dec 2021 18:46:37 GMT",
+                        ],
+                    ],
                 ]
             ]
-        ]);
+        ],
+        '');
 
         $blobClient = $this->createMock(BlobRestProxy::class);
         $blobClient->expects(self::any())
