@@ -428,12 +428,11 @@ class AzureBlobStorageAdapterTest extends TestCase
             $blobClient->expects(self::any())
                 ->method('copyBlob')
                 ->willReturn(null);
+            $this->expectNotToPerformAssertions();
         }
 
         $service = new AzureBlobStorageAdapter($blobClient, $this->logger, 'default');
-        $response = true;
         $service->copy(self::FILE_TEST, 'test.png', new Config());
-        $this->assertTrue($response);
     }
 
     /**
