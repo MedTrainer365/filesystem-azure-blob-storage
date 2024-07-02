@@ -1,4 +1,4 @@
-FROM rrcfesc/lamp:7.2
+FROM medtrainer.azurecr.io/rrcfesc/lamp:7.2
 
 LABEL maintainer="rruiz@medtrainer.com"
 
